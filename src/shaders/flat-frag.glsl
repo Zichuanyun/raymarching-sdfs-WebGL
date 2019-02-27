@@ -1,7 +1,8 @@
 #version 300 es
-#define MIN_DIS 0.001
+#define MIN_DIS 0.0001
+#define MAX_DIS 1000.0
 #define EPSILON 0.001
-#define MAX_ITER 10
+#define MAX_ITER 40
 precision highp float;
 
 // begin util =================================================
@@ -18,6 +19,7 @@ mat4 constructRotationMat(vec3 r) {
   // init
   vec3 R = radians(r);
   // Z -> Y -> X
+  // inverse: X->Y->Z
   return mat4(
     cos(r.z), -sin(r.z), 0.0, 0.0, // 1st col
     sin(r.z), cos(r.z), 0.0, 0.0,  // 2nd col
@@ -36,34 +38,72 @@ mat4 constructRotationMat(vec3 r) {
   );
 }
 
-mat4 constructTransformationMat(vec3 t, vec3 s, vec3 r) {
-  // SDF cannot do free scaling
-  return constructTranslationMat(t)
-          * constructRotationMat(r);
+mat4 constructScaleMat(vec3 s) {
+  return mat4(
+    s.x, 0.0, 0.0, 0.0,            // 1st col
+    0.0, s.y, 0.0, 0.0,            // 2nd col
+    0.0, 0.0, s.z, 0.0,            // 3rd col
+    0.0, 0.0, 0.0, 1.0             // 4th col
+  );
+
+  // return mat4(
+  //   1.0, 0.0, 0.0, 0.0,            // 1st col
+  //   0.0, 1.0, 0.0, 0.0,            // 2nd col
+  //   0.0, 0.0, 1.0, 0.0,            // 3rd col
+  //   0.0, 0.0, 0.0, 1.0             // 4th col
+  // );
+}
+
+mat4 constructTransformationMat(vec3 t, vec3 r, vec3 s) {
+  return constructTranslationMat(t) * constructRotationMat(r)
+  * constructScaleMat(s);
+}
+
+mat4 constructInverseTransformationMat(vec3 t, vec3 r, vec3 s) {
+  return constructScaleMat(1.0/s) * constructRotationMat(-r)
+  * constructTranslationMat(-t);
 }
 
 // unit sphere -------------------------------------------------
 float sdSphereOri(vec3 p) {
-  return length(p) - 1.0;
+  return length(p) - 0.5;
 }
 
-float sdSphere(vec3 p, mat4 mat, float scale) {
-  // mat4 inverse_mat = ;
-  // vec3 p_model = ;
-  return (length(vec3(vec4(p, 1.0) * inverse(mat)) / scale) - 1.0) * scale;
+float sdSphere(vec3 p, mat4 inverse_mat) {
+  vec3 p_model = vec3(inverse_mat * vec4(p, 1.0));
+  return sdSphereOri(p_model);
 }
 
-vec3 sdSphereNormal(vec3 p) {
-  float x = sdSphereOri(vec3(p.x + EPSILON, p.y, p.z))
-            - sdSphereOri(vec3(p.x - EPSILON, p.y, p.z));
-  float y = sdSphereOri(vec3(p.x, p.y + EPSILON, p.z))
-            - sdSphereOri(vec3(p.x, p.y - EPSILON, p.z));
-  float z = sdSphereOri(vec3(p.x, p.y, p.z + EPSILON))
-            - sdSphereOri(vec3(p.x, p.y, p.z - EPSILON));
+vec3 sdSphereNormal(vec3 p, mat4 inverse_mat) {
+  float x = sdSphere(vec3(p.x + EPSILON, p.y, p.z), inverse_mat)
+            - sdSphere(vec3(p.x - EPSILON, p.y, p.z), inverse_mat);
+  float y = sdSphere(vec3(p.x, p.y + EPSILON, p.z), inverse_mat)
+            - sdSphere(vec3(p.x, p.y - EPSILON, p.z), inverse_mat);
+  float z = sdSphere(vec3(p.x, p.y, p.z + EPSILON), inverse_mat)
+            - sdSphere(vec3(p.x, p.y, p.z - EPSILON), inverse_mat);
   return normalize(vec3(x, y, z));
 }
 
-// cone -------------------------------------------------
+// unit box -------------------------------------------------
+float sdBoxOri(vec3 p) {
+  vec3 d = abs(p) - vec3(0.5);
+  return length(max(d, 0.0)) + min(max(d.x,max(d.y,d.z)),0.0);
+}
+
+float sdBox(vec3 p, mat4 inverse_mat) {
+  vec3 p_model = vec3(inverse_mat * vec4(p, 1.0));
+  return sdBoxOri(p_model);
+}
+
+vec3 sdBoxNormal(vec3 p, mat4 inverse_mat) {
+  float x = sdBox(vec3(p.x + EPSILON, p.y, p.z), inverse_mat)
+            - sdBox(vec3(p.x - EPSILON, p.y, p.z), inverse_mat);
+  float y = sdBox(vec3(p.x, p.y + EPSILON, p.z), inverse_mat)
+            - sdBox(vec3(p.x, p.y - EPSILON, p.z), inverse_mat);
+  float z = sdBox(vec3(p.x, p.y, p.z + EPSILON), inverse_mat)
+            - sdBox(vec3(p.x, p.y, p.z - EPSILON), inverse_mat);
+  return normalize(vec3(x, y, z));
+}
 
 // finish util =================================================
 
@@ -76,27 +116,26 @@ uniform vec3 u_V;
 in vec2 fs_Pos;
 out vec4 out_Col;
 
-float fov_deg = 90.0;
+float fov_deg = 60.0;
 
-struct Transform {
-  vec3 translation;
-  float scale;
-  mat4 mat;
+struct UnitSphere {
   mat4 inverse_mat;
-  vec3 rotation;
-};
-
-struct SampleSphere {
-  Transform transform;
 } sample_sphere;
 
-void main() {
-  sample_sphere.transform.mat = constructTransformationMat(vec3(0.0, 3.0, 0.0),
-                                                 vec3(2.0, 1.0, 1.0), 
-                                                 vec3(0.0, 0.0, 0.0));
-  // sample_sphere.transform.inverse_mat = inverse(sample_sphere.transform.mat);                                   
-  sample_sphere.transform.scale = 3.0;
+struct UnitBox {
+  mat4 inverse_mat;
+} sample_box;
 
+void main() {
+  sample_sphere.inverse_mat = constructInverseTransformationMat(
+    vec3(0.0, 0.0, 0.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.0, 1.0, 2.0)); // s
+
+  sample_box.inverse_mat = constructInverseTransformationMat(
+    vec3(0.0, 0.0, 0.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(3.0, 2.0, 1.0)); // s
   
   // the following part doesn't cost too much
   // profiling tested
@@ -124,13 +163,14 @@ void main() {
   for (int i = 0; i < MAX_ITER; ++i) {
     
     float march_step;
-    // march_step = sdSphereOri(origin);
-    march_step = sdSphere(origin,
-                                sample_sphere.transform.mat,
-                                sample_sphere.transform.scale);
+    // march_step = sdBox(origin, sample_box.inverse_mat);
+    march_step = sdSphere(origin, sample_sphere.inverse_mat);
+
     if (march_step <= MIN_DIS) {
       color = vec3(0.8);
-      // normal = sdSphereNormal(origin);
+      // normal = sdBoxNormal(origin, sample_box.inverse_mat);
+      normal = sdSphereNormal(origin, sample_sphere.inverse_mat);
+
       color = (normal + vec3(1.0)) * 0.5;
       break;
     }
