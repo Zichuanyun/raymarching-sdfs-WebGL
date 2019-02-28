@@ -2,7 +2,8 @@
 #define MIN_DIS 0.00001
 #define MAX_DIS 100.0
 #define EPSILON 0.0001
-#define MAX_ITER 400
+#define MAX_ITER 350
+// #define SCALE 3.0
 precision highp float;
 
 // begin util =================================================
@@ -129,13 +130,35 @@ float rayMarchScene(vec3 p) {
   float d_box = sdBox(p, box.inverse_mat);
   dis = smin(d_pillar, d_box, 0.6);
 
-  float d_sphere0 = sdSphere(p, spheres[0].inverse_mat);
-  dis = subtractSDF(dis, d_sphere0);
+  float d_sphere = sdSphere(p, spheres[0].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
   
-  float d_sphere1 = sdSphere(p, spheres[1].inverse_mat);
-  dis = subtractSDF(dis, d_sphere1);
+  d_sphere = sdSphere(p, spheres[1].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
 
+  d_sphere = sdSphere(p, spheres[2].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
 
+  d_sphere = sdSphere(p, spheres[3].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[4].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[5].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[6].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[7].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[8].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
+
+  d_sphere = sdSphere(p, spheres[9].inverse_mat);
+  dis = subtractSDF(dis, d_sphere);
 
   return dis;
 }
@@ -165,12 +188,56 @@ void main() {
   spheres[0].inverse_mat = constructInverseTransformationMat(
     vec3(0.8, 2.0, 0.8),  // t
     vec3(0.0, 0.0, 0.0),  // r
-    vec3(2.0, 2.0, 2.0)); // s
+    vec3(1.0)); // s
 
   spheres[1].inverse_mat = constructInverseTransformationMat(
-    vec3(-0.2, 0.5, -0.2),  // t
+    vec3(-0.8, 2.0, -0.8),  // t
     vec3(0.0, 0.0, 0.0),  // r
-    vec3(0.35, 0.35, 0.35)); // s
+    vec3(1.6)); // s
+
+  spheres[2].inverse_mat = constructInverseTransformationMat(
+    vec3(1.0, 2.0, -1.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.3)); // s
+
+  spheres[3].inverse_mat = constructInverseTransformationMat(
+    vec3(-1.0, 2.0, 1.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.0)); // s
+
+  // side 1
+  spheres[4].inverse_mat = constructInverseTransformationMat(
+    vec3(2.0, 0.0, 0.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(3.5)); // s
+
+  // side 2
+  spheres[5].inverse_mat = constructInverseTransformationMat(
+    vec3(-2.0, 0.9, 0.9),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.9)); // s
+
+  spheres[6].inverse_mat = constructInverseTransformationMat(
+    vec3(-2.0, -0.75, -0.75),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(2.2)); // s
+
+  // side 3
+  spheres[7].inverse_mat = constructInverseTransformationMat(
+    vec3(1.3, 1.1, -2.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.0)); // s
+
+  spheres[8].inverse_mat = constructInverseTransformationMat(
+    vec3(0.1, 1.1, -2.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.05)); // s
+  
+  spheres[9].inverse_mat = constructInverseTransformationMat(
+    vec3(-1.2, 1.1, -2.0),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(1.1)); // s
+
 
   // the following part doesn't cost too much
   // profiling tested
