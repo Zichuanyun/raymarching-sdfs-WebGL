@@ -1,8 +1,8 @@
 #version 300 es
-#define MIN_DIS 0.0001
-#define MAX_DIS 1000.0
-#define EPSILON 0.001
-#define MAX_ITER 40
+#define MIN_DIS 0.00001
+#define MAX_DIS 100.0
+#define EPSILON 0.0001
+#define MAX_ITER 400
 precision highp float;
 
 // begin util =================================================
@@ -45,13 +45,6 @@ mat4 constructScaleMat(vec3 s) {
     0.0, 0.0, s.z, 0.0,            // 3rd col
     0.0, 0.0, 0.0, 1.0             // 4th col
   );
-
-  // return mat4(
-  //   1.0, 0.0, 0.0, 0.0,            // 1st col
-  //   0.0, 1.0, 0.0, 0.0,            // 2nd col
-  //   0.0, 0.0, 1.0, 0.0,            // 3rd col
-  //   0.0, 0.0, 0.0, 1.0             // 4th col
-  // );
 }
 
 mat4 constructTransformationMat(vec3 t, vec3 r, vec3 s) {
@@ -65,44 +58,42 @@ mat4 constructInverseTransformationMat(vec3 t, vec3 r, vec3 s) {
 }
 
 // unit sphere -------------------------------------------------
-float sdSphereOri(vec3 p) {
+float sdSphere(vec3 p_world, mat4 inverse_mat) {
+  vec3 p = vec3(inverse_mat * vec4(p_world, 1.0));
   return length(p) - 0.5;
 }
 
-float sdSphere(vec3 p, mat4 inverse_mat) {
-  vec3 p_model = vec3(inverse_mat * vec4(p, 1.0));
-  return sdSphereOri(p_model);
-}
-
-vec3 sdSphereNormal(vec3 p, mat4 inverse_mat) {
-  float x = sdSphere(vec3(p.x + EPSILON, p.y, p.z), inverse_mat)
-            - sdSphere(vec3(p.x - EPSILON, p.y, p.z), inverse_mat);
-  float y = sdSphere(vec3(p.x, p.y + EPSILON, p.z), inverse_mat)
-            - sdSphere(vec3(p.x, p.y - EPSILON, p.z), inverse_mat);
-  float z = sdSphere(vec3(p.x, p.y, p.z + EPSILON), inverse_mat)
-            - sdSphere(vec3(p.x, p.y, p.z - EPSILON), inverse_mat);
-  return normalize(vec3(x, y, z));
-}
-
-// unit box -------------------------------------------------
-float sdBoxOri(vec3 p) {
+// unit box
+float sdBox(vec3 p_world, mat4 inverse_mat) {
+  vec3 p = vec3(inverse_mat * vec4(p_world, 1.0));
   vec3 d = abs(p) - vec3(0.5);
-  return length(max(d, 0.0)) + min(max(d.x,max(d.y,d.z)),0.0);
+  return length(max(d, 0.0)) + min(max(d.x,max(d.y, d.z)), 0.0);
 }
 
-float sdBox(vec3 p, mat4 inverse_mat) {
-  vec3 p_model = vec3(inverse_mat * vec4(p, 1.0));
-  return sdBoxOri(p_model);
+// unit cone -------------------------------------------------
+float sdCone(vec3 p_world, mat4 inverse_mat) {
+  vec3 p = vec3(inverse_mat * vec4(p_world, 1.0));
+  vec2 c = vec2(1, 1);
+  float q = length(p.xz);
+  return dot(normalize(c), vec2(q, p.y));
 }
 
-vec3 sdBoxNormal(vec3 p, mat4 inverse_mat) {
-  float x = sdBox(vec3(p.x + EPSILON, p.y, p.z), inverse_mat)
-            - sdBox(vec3(p.x - EPSILON, p.y, p.z), inverse_mat);
-  float y = sdBox(vec3(p.x, p.y + EPSILON, p.z), inverse_mat)
-            - sdBox(vec3(p.x, p.y - EPSILON, p.z), inverse_mat);
-  float z = sdBox(vec3(p.x, p.y, p.z + EPSILON), inverse_mat)
-            - sdBox(vec3(p.x, p.y, p.z - EPSILON), inverse_mat);
-  return normalize(vec3(x, y, z));
+// SDF untility
+float unionSDF(float d1, float d2) {
+  return min(d1, d2);
+}
+
+float intersectionSDF(float d1, float d2) {
+  return max(d1, d2);
+}
+
+float subtractSDF(float d1, float d2) {
+  return max(d1, -d2);
+}
+
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b-a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0-h);
 }
 
 // finish util =================================================
@@ -120,23 +111,67 @@ float fov_deg = 60.0;
 
 struct UnitSphere {
   mat4 inverse_mat;
-} sample_sphere;
+};
+
+UnitSphere spheres[10];
 
 struct UnitBox {
   mat4 inverse_mat;
-} sample_box;
+} box, pillar;
+
+struct UnitCone {
+  mat4 inverse_mat;
+} cone;
+
+float rayMarchScene(vec3 p) {
+  float dis = MAX_DIS;
+  float d_pillar = sdBox(p, pillar.inverse_mat);
+  float d_box = sdBox(p, box.inverse_mat);
+  dis = smin(d_pillar, d_box, 0.6);
+
+  float d_sphere0 = sdSphere(p, spheres[0].inverse_mat);
+  dis = subtractSDF(dis, d_sphere0);
+  
+  float d_sphere1 = sdSphere(p, spheres[1].inverse_mat);
+  dis = subtractSDF(dis, d_sphere1);
+
+
+
+  return dis;
+}
+
+vec3 getSceneNormal(vec3 p) {
+  float x = rayMarchScene(vec3(p.x + EPSILON, p.y, p.z))
+            - rayMarchScene(vec3(p.x - EPSILON, p.y, p.z));
+  float y = rayMarchScene(vec3(p.x, p.y + EPSILON, p.z))
+            - rayMarchScene(vec3(p.x, p.y - EPSILON, p.z));
+  float z = rayMarchScene(vec3(p.x, p.y, p.z + EPSILON))
+            - rayMarchScene(vec3(p.x, p.y, p.z - EPSILON));
+  return normalize(vec3(x, y, z));
+}
 
 void main() {
-  sample_sphere.inverse_mat = constructInverseTransformationMat(
+  box.inverse_mat = constructInverseTransformationMat(
     vec3(0.0, 0.0, 0.0),  // t
     vec3(0.0, 0.0, 0.0),  // r
-    vec3(1.0, 1.0, 2.0)); // s
+    vec3(4.0, 4.0, 4.0)); // s
 
-  sample_box.inverse_mat = constructInverseTransformationMat(
-    vec3(0.0, 0.0, 0.0),  // t
+  pillar.inverse_mat = constructInverseTransformationMat(
+    vec3(0.0, -4.0, 0.0),  // t
     vec3(0.0, 0.0, 0.0),  // r
-    vec3(3.0, 2.0, 1.0)); // s
-  
+    vec3(1.0, 6.0, 1.0)); // s
+
+  // top 
+  spheres[0].inverse_mat = constructInverseTransformationMat(
+    vec3(0.8, 2.0, 0.8),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(2.0, 2.0, 2.0)); // s
+
+  spheres[1].inverse_mat = constructInverseTransformationMat(
+    vec3(-0.2, 0.5, -0.2),  // t
+    vec3(0.0, 0.0, 0.0),  // r
+    vec3(0.35, 0.35, 0.35)); // s
+
   // the following part doesn't cost too much
   // profiling tested
   vec3 Front = normalize(u_Ref - u_Eye);
@@ -161,20 +196,18 @@ void main() {
   vec3 normal = vec3(0.5);
 
   for (int i = 0; i < MAX_ITER; ++i) {
-    
     float march_step;
-    // march_step = sdBox(origin, sample_box.inverse_mat);
-    march_step = sdSphere(origin, sample_sphere.inverse_mat);
-
+    march_step = rayMarchScene(origin);
+    origin = origin + dir * march_step;
     if (march_step <= MIN_DIS) {
       color = vec3(0.8);
-      // normal = sdBoxNormal(origin, sample_box.inverse_mat);
-      normal = sdSphereNormal(origin, sample_sphere.inverse_mat);
-
-      color = (normal + vec3(1.0)) * 0.5;
+      normal = getSceneNormal(origin);
+      color = (normal + 1.0) / 2.0;
       break;
     }
-    origin = origin + dir * march_step;
+    if (march_step >= MAX_DIS) {
+      break;
+    }
   }
   
   
