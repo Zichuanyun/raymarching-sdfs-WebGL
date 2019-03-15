@@ -31,6 +31,8 @@ class ShaderProgram {
   unifTime: WebGLUniformLocation;
   unifH: WebGLUniformLocation;
   unifV: WebGLUniformLocation;
+  unifTwist: WebGLUniformLocation;
+  unifInter: WebGLUniformLocation;
 
   constructor(shaders: Array<Shader>) {
     this.prog = gl.createProgram();
@@ -51,6 +53,9 @@ class ShaderProgram {
     this.unifTime   = gl.getUniformLocation(this.prog, "u_Time");
     this.unifH   = gl.getUniformLocation(this.prog, "u_H");
     this.unifV   = gl.getUniformLocation(this.prog, "u_V");
+    this.unifTwist = gl.getUniformLocation(this.prog, "u_Twist");
+    this.unifInter = gl.getUniformLocation(this.prog, "u_Inter");
+
   }
 
   use() {
@@ -94,6 +99,20 @@ class ShaderProgram {
     this.use();
     if(this.unifTime !== -1) {
       gl.uniform1f(this.unifTime, t);
+    }
+  }
+
+  setTwist(t: number) {
+    this.use();
+    if(this.unifTwist !== -1) {
+      gl.uniform1f(this.unifTwist, t);
+    }
+  }
+
+  setInter(i: number) {
+    this.use();
+    if(this.unifInter !== -1) {
+      gl.uniform1f(this.unifInter, i);
     }
   }
 

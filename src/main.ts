@@ -7,15 +7,11 @@ import Camera from './Camera';
 import {setGL} from './globals';
 import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
 
-// Define an object with application parameters and button callbacks
-// This will be referred to by dat.GUI's functions that add GUI elements.
-const controls = {
-  tesselations: 5,
-  'Load Scene': loadScene, // A function pointer, essentially
-};
+
 
 let square: Square;
 let time: number = 0;
+let start_time: number = Date.now();
 
 function loadScene() {
   square = new Square(vec3.fromValues(0, 0, 0));
@@ -47,6 +43,14 @@ function main() {
 
   // Add controls to the gui
   const gui = new DAT.GUI();
+  // Define an object with application parameters and button callbacks
+  // This will be referred to by dat.GUI's functions that add GUI elements.
+  const controls = {
+    interpolation: 0.5,
+    twisting: 0.01,
+  };
+  gui.add(controls, 'interpolation', 0, 1).step(0.05);
+  gui.add(controls, 'twisting', 0, 1).step(0.05);
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -83,6 +87,11 @@ function main() {
     gl.viewport(0, 0, window.innerWidth, window.innerHeight);
     renderer.clear();
     processKeyPresses();
+    flat.setInter(controls.interpolation);
+    flat.setTwist(controls.twisting);
+    let time_helper = Date.now() - start_time;
+    console.log(time_helper);
+    flat.setTime(time_helper);
     renderer.render(camera, flat, [
       square,
     ], time);

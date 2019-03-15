@@ -24,13 +24,13 @@ class OpenGLRenderer {
 
   render(camera: Camera, prog: ShaderProgram, drawables: Array<Drawable>, time: number) {
     prog.setEyeRefUp(camera.controls.eye, camera.controls.center, camera.controls.up);
-    console.log("-----------");
-    console.log("eye:");
-    console.log(camera.controls.eye);
-    console.log("center:");
-    console.log(camera.controls.center);
-    console.log("-----------");
-    prog.setTime(time);
+    // console.log("-----------");
+    // console.log("eye:");
+    // console.log(camera.controls.eye);
+    // console.log("center:");
+    // console.log(camera.controls.center);
+    // console.log("-----------");
+    // prog.setTime(time);
 
     for (let drawable of drawables) {
       prog.draw(drawable);
