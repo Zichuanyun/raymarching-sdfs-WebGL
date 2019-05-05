@@ -295,7 +295,7 @@ void main() {
   spheres[3].inverse_mat = constructInverseTransformationMat(
     vec3(-1.0, 2.0, 1.0),  // t
     vec3(0.0, 0.0, 0.0),  // r
-    vec3(1.0)); // s
+    vec3(0.6)); // s
 
   // side 1
   spheres[4].inverse_mat = constructInverseTransformationMat(
